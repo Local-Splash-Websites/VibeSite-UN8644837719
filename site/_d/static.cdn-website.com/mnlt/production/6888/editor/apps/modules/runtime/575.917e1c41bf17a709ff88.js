@@ -1,0 +1,1 @@
+"use strict";(self.webpackJsonpRuntime=self.webpackJsonpRuntime||[]).push([[575],{8575(e,n,t){t.r(n),t.d(n,{init:()=>o});var r=t(7706);async function o(){return[...document.querySelectorAll(".hamburgerButton")].forEach(e=>{e.removeEventListener("click",c),e.addEventListener("click",c)}),Promise.resolve({})}function c(){(0,r.OK)()||window.layoutApp.toggleNavMenus()}}}]);

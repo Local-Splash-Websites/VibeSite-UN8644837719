@@ -6,29 +6,55 @@ DirectoryIndex index.html
 
 RewriteEngine On
 
+# Duda's telemetry and the CDN's analytics beacon: accept and drop.
+RewriteRule ^_d/rtc\.multiscreensite\.com/ - [R=204,L]
+RewriteRule ^cdn-cgi/rum - [R=204,L]
+RewriteRule ^_dm/s/rt/actions/(logs|lcp-report) - [R=204,L]
+
 # The copied Duda forms post to Duda's form endpoint; handle them locally.
 RewriteRule ^_dm/s/rt/actions/form/ lead-webhook.php [L]
 
-# Duda's font stylesheet varies only by query; serve the copy saved for that query.
-RewriteRule ^_d/irp\.cdn-website\.com/fonts/css2$ fonts-css2.php [L]
+# Assets requested with a query string: serve the response saved for that exact query.
+RewriteCond %{QUERY_STRING} .
+RewriteRule ^_d/ qrouter.php [L]
 
-# Image sizes Duda's runtime picks at run time that were not copied: serve the closest copied size.
+# Image sizes Duda's runtime picks at run time that were never requested on the live site:
+# serve the closest copied size.
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule ^_d/irp\.cdn-website\.com/.+\.(png|jpe?g|webp|gif)$ img-fallback.php [L,NC]
 
-# Clean URLs: /about.html -> /about, and serve /about from about.html
+# Clean URLs: /about.html -> /about, /index.html -> /
 RewriteCond %{THE_REQUEST} \s/+index\.html[\s?] [NC]
 RewriteRule ^ / [R=301,L]
 RewriteCond %{THE_REQUEST} \s/+([^\s?]+)\.html[\s?] [NC]
 RewriteRule ^ /%1 [R=301,L]
+
+# Duda serves different HTML to tablets and phones (by User-Agent); _t/ and _m/ hold those copies,
+# and _a/ (only where Duda's Android-phone HTML differs from iPhone's) the Android phone copy.
+RewriteCond %{HTTP_USER_AGENT} "iPad|Tablet|Kindle|Silk/|PlayBook|Nexus (7|9|10)|SM-T|SM-X|Android(?!.*Mobile)" [NC]
+RewriteRule ^ - [E=DEV:_t]
+RewriteCond %{ENV:DEV} ^$
+RewriteCond %{HTTP_USER_AGENT} "Android.*Mobile" [NC]
+RewriteCond %{DOCUMENT_ROOT}/_a -d
+RewriteRule ^ - [E=DEV:_a]
+RewriteCond %{ENV:DEV} ^$
+RewriteCond %{HTTP_USER_AGENT} "iPhone|iPod|Android.*Mobile|Windows Phone|IEMobile|BlackBerry|BB10|Opera Mini|webOS" [NC]
+RewriteRule ^ - [E=DEV:_m]
+RewriteCond %{ENV:DEV} ^_[mta]$
+RewriteCond %{DOCUMENT_ROOT}/%{ENV:DEV}/index.html -f
+RewriteRule ^$ %{ENV:DEV}/index.html [L]
+RewriteCond %{ENV:DEV} ^_[mta]$
+RewriteCond %{DOCUMENT_ROOT}/%{ENV:DEV}/$1.html -f
+RewriteRule ^(.+?)/?$ %{ENV:DEV}/$1.html [L]
+
+# Serve /about from about.html
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME}.html -f
 RewriteRule ^(.+)$ $1.html [L]
 
-# Same as the live site: /home goes to the home page
+# Same as Duda: /home goes to the home page
 RewriteRule ^home/?$ / [R=301,L]
 
-# Duda's font stylesheet is served from a path with no extension
 <FilesMatch "^css2$">
   ForceType text/css
 </FilesMatch>
@@ -49,6 +75,8 @@ RewriteRule ^home/?$ / [R=301,L]
 <IfModule mod_headers.c>
   <FilesMatch "\.html$">
     Header set Cache-Control "no-cache"
+    # the HTML differs by device, so caches must key on User-Agent
+    Header append Vary User-Agent
   </FilesMatch>
   Header always set X-Content-Type-Options "nosniff"
 </IfModule>
@@ -56,3 +84,4 @@ RewriteRule ^home/?$ / [R=301,L]
 AddType font/woff2 .woff2
 AddType image/webp .webp
 AddType video/mp4 .mp4
+AddType text/javascript .js
