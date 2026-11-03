@@ -13,9 +13,11 @@ An exact copy of the Duda site https://www.oddjobprosllc.com (Duda site ID `bc06
 
 The copied Duda forms post JSON to `/_dm/s/rt/actions/form/<id>`. `.htaccess` sends that to
 `site/lead-webhook.php`, which maps the field ids to labels with `form-fields.json`, forwards the
-lead to `LEADS_API_URL` (see `.env.example`) and answers in Duda's format, so the form goes on to its
-thank-you page as before. Without `LEADS_API_URL` the form shows its error message and nothing is sent.
+lead to the shared lead service at `LEADS_SERVICE_URL/v1/lead` (see `.env.example`) and answers in Duda's
+format, so the form goes on to its thank-you page as before. The lead service finds the site in Deploy's
+site registry (RelevantAds site_name UN8644837719). Without `LEADS_SERVICE_URL` the form shows its error
+message and nothing is sent.
 
 ## Run
 
-    docker build -t oddjobprosllc . && docker run -p 8080:80 -e LEADS_SITE_NAME=bc06e187 oddjobprosllc
+    docker build -t oddjobprosllc . && docker run -p 8080:80 -e LEADS_SERVICE_URL=http://website-lead-submit:8080 oddjobprosllc

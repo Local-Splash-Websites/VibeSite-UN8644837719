@@ -5,6 +5,6 @@ RUN a2enmod rewrite headers expires deflate \
  && sed -ri 's!AllowOverride None!AllowOverride All!g' /etc/apache2/apache2.conf
 COPY site/ /var/www/site/public/
 COPY form-fields.json /var/www/site/form-fields.json
-# LEADS_API_URL, LEADS_API_KEY and LEADS_SITE_NAME are read from the container environment.
-RUN echo 'PassEnv LEADS_API_URL LEADS_API_KEY LEADS_SITE_NAME' > /etc/apache2/conf-enabled/leads-env.conf
+# LEADS_SERVICE_URL (the shared lead service) is read from the container environment.
+RUN echo 'PassEnv LEADS_SERVICE_URL' > /etc/apache2/conf-enabled/leads-env.conf
 EXPOSE 80

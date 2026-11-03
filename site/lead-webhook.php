@@ -1,5 +1,5 @@
 <?php
-// Receives the site's lead forms and forwards them to the leads API.
+// Receives the site's lead forms and forwards them to the shared LocalSplash lead service.
 // The copied Duda forms post JSON to /_dm/s/rt/actions/form/<id> (rewritten here by .htaccess)
 // and expect Duda's JSON reply; plain HTML form posts are accepted too.
 // Settings come from the environment or from a .env file one level above the web root.
@@ -84,40 +84,56 @@ if ($isDuda) {
 foreach (['name' => 120, 'phone' => 40, 'email' => 160, 'address' => 300] as $k => $max) $lead[$k] = mb_substr($lead[$k], 0, $max);
 if ($lead['name'] === '' || ($lead['phone'] === '' && $lead['email'] === '')) respond(false, 422, 'Enter your name and a phone number or email.');
 
-$apiUrl = env_value('LEADS_API_URL');
-$payload = $lead + [
-    'site_name'    => env_value('LEADS_SITE_NAME'),
-    'page'         => mb_substr((string)($_SERVER['HTTP_REFERER'] ?? ''), 0, 500),
-    'ip'           => $_SERVER['REMOTE_ADDR'] ?? '',
-    'user_agent'   => mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 300),
-    'submitted_at' => gmdate('c'),
-];
-
-if ($apiUrl === '') {
-    error_log('lead-webhook: LEADS_API_URL is not set; lead not forwarded: ' . json_encode($payload));
+// Forward to the shared lead service (POST /v1/lead), in the shape of a Duda form post: dmform-N values with
+// label-dmform-N labels. The service finds the site in Deploy's site registry from X-Forwarded-Host and
+// sends the lead on under the registry's RelevantAds site_name.
+$serviceUrl = rtrim(env_value('LEADS_SERVICE_URL'), '/');
+if ($serviceUrl === '') {
+    error_log('lead-webhook: LEADS_SERVICE_URL is not set; lead not forwarded: ' . json_encode($lead));
     respond(false, 503, "That didn't work. The form wasn't sent. Please call us instead.");
 }
 
-$headers = ['Content-Type: application/json', 'Accept: application/json'];
-$key = env_value('LEADS_API_KEY');
-if ($key !== '') $headers[] = 'Authorization: Bearer ' . $key;
+$dudaLabels = ['name' => 'FirstName', 'phone' => 'PhoneNumber', 'email' => 'EmailAddress', 'address' => 'StreetAddress', 'message' => 'Message'];
+$fields = [];
+foreach ($dudaLabels as $k => $label) {
+    if ($lead[$k] !== '') $fields[$label] = $lead[$k];
+}
+foreach ($lead['extra'] as $label => $value) $fields[ucfirst($label)] = $value;
+$host = strtolower(preg_replace('/:\d+$/', '', trim(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? ''))[0])));
+$fields['DomainName'] = $host;
 
-$ch = curl_init($apiUrl);
+$post = ['dmformsubject' => 'Form Message', 'form_id' => $lead['form_id']];
+$i = 0;
+foreach ($fields as $label => $value) {
+    $post["dmform-$i"] = $value;
+    $post["label-dmform-$i"] = $label;
+    $i++;
+}
+
+$ch = curl_init($serviceUrl . '/v1/lead');
 curl_setopt_array($ch, [
     CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => json_encode($payload),
-    CURLOPT_HTTPHEADER     => $headers,
+    CURLOPT_POSTFIELDS     => http_build_query($post),
+    CURLOPT_HTTPHEADER     => [
+        'Content-Type: application/x-www-form-urlencoded',
+        'Accept: application/json',
+        'X-Forwarded-Host: ' . $host,
+        'X-Forwarded-For: ' . ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''),
+        'Referer: ' . mb_substr((string)($_SERVER['HTTP_REFERER'] ?? ''), 0, 500),
+        'User-Agent: ' . mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 300),
+    ],
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT        => 15,
+    CURLOPT_TIMEOUT        => 30,
 ]);
 $resp = curl_exec($ch);
 $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $err = curl_error($ch);
 curl_close($ch);
+$reply = is_string($resp) ? json_decode($resp, true) : null;
 
-if ($resp === false || $status < 200 || $status >= 300) {
-    error_log("lead-webhook: leads API failed ($status) $err " . substr((string)$resp, 0, 500));
-    respond(false, 502, "That didn't work. The form wasn't sent. Please try again or call us.");
+if ($resp === false || $status < 200 || $status >= 300 || (is_array($reply) && ($reply['ok'] ?? true) === false)) {
+    error_log("lead-webhook: lead service failed ($status) $err " . substr((string)$resp, 0, 500));
+    respond(false, 502, (is_array($reply) && !empty($reply['message'])) ? (string)$reply['message'] : "That didn't work. The form wasn't sent. Please try again or call us.");
 }
 
 respond(true, 200, '', $submitted);
