@@ -98,7 +98,8 @@ $fields = [];
 foreach ($dudaLabels as $k => $label) {
     if ($lead[$k] !== '') $fields[$label] = $lead[$k];
 }
-foreach ($lead['extra'] as $label => $value) $fields[ucfirst($label)] = $value;
+// Unmapped fields keep their Duda field id as the label (PHP turns numeric keys into ints).
+foreach ($lead['extra'] as $label => $value) $fields[is_int($label) ? 'Field ' . $label : ucfirst($label)] = $value;
 $host = strtolower(preg_replace('/:\d+$/', '', trim(explode(',', (string)($_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? ''))[0])));
 $fields['DomainName'] = $host;
 
