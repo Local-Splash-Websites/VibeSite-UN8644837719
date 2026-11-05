@@ -78,6 +78,10 @@ RewriteRule ^home/?$ / [R=301,L]
     # the HTML differs by device, so caches must key on User-Agent
     Header append Vary User-Agent
   </FilesMatch>
+  # images, fonts, scripts and styles may be cached for a week
+  <FilesMatch "\.(css|js|mjs|png|jpe?g|gif|webp|avif|svg|ico|woff2?|ttf|otf|eot|mp4|webm)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
   Header always set X-Content-Type-Options "nosniff"
 </IfModule>
 
