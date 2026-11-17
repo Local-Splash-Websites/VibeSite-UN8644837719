@@ -77,7 +77,13 @@ if ($isDuda) {
     }
     $lead['form_id'] = $clip(basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: ''), 60);
 } else {
+    // plain HTML forms (the appointment request form): a filled honeypot field means a bot; accept and drop it
+    if (trim((string)($_POST['company_website'] ?? '')) !== '') respond(true, 200);
     foreach (['name', 'phone', 'email', 'address', 'message'] as $k) $lead[$k] = $clip($_POST[$k] ?? '', 4000);
+    foreach (['preferred_date' => 'preferred date', 'preferred_time' => 'preferred time', 'consent' => 'sms consent'] as $k => $label) {
+        $v = $clip($_POST[$k] ?? '', 200);
+        if ($v !== '') $lead['extra'][$label] = $v;
+    }
     $lead['form_id'] = $clip($_POST['form_id'] ?? '', 60);
 }
 
