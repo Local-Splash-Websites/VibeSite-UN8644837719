@@ -7167,25 +7167,10 @@ if(data.inEditor){
 
 
 <script type="text/javascript" id="d_track_sp">
-    ;(function(p,l,o,w,i,n,g){if(!p[i]){p.GlobalSnowplowNamespace=p.GlobalSnowplowNamespace||[];
-        p.GlobalSnowplowNamespace.push(i);p[i]=function(){(p[i].q=p[i].q||[]).push(arguments)
-        };p[i].q=p[i].q||[];n=l.createElement(o);g=l.getElementsByTagName(o)[0];n.async=1;
-        n.src=w;g.parentNode.insertBefore(n,g)}}(window,document,"script","//d32hwlnfiv2gyn.cloudfront.net/sp-2.0.0-dm-0.1.min.js","snowplow"));
-    window.dmsnowplow  = window.snowplow;
-
-    dmsnowplow('newTracker', 'cf', 'd32hwlnfiv2gyn.cloudfront.net', { // Initialise a tracker
-        appId: 'bc06e187'
-    });
-
-    // snowplow queries element styles so we wait until CSS calculations are done.
+    // Duda's page-view tracker is not loaded (the site no longer runs on Duda); its calls are no-ops.
+    window.snowplow = window.dmsnowplow = function () {};
     requestAnimationFrame(() => {
-        dmsnowplow('trackPageView');
-        _dm_insite.forEach((rule) => {
-            // Specifically in popup only the client knows if it is shown or not so we don't always want to track its impression here
-            // the tracking is in popup.js
-            if (rule.actionName !== "popup") {
-                dmsnowplow('trackStructEvent', 'insite', 'impression', rule.ruleType, rule.ruleId);
-            }
+        (window._dm_insite || []).forEach((rule) => {
             window?.waitForDeferred?.('dmAjax', () => {
                 $.DM.events.trigger('event-ruleTriggered', {value: rule});
             });
